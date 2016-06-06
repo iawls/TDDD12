@@ -1,0 +1,144 @@
+
+3) 
+mysql> CREATE TABLE jbmanager( id int(11) NOT NULL DEFAULT '0',  
+->name varchar(20) DEFAULT NULL,
+->salary int(11) DEFAULT NULL, 
+->manager int(11) DEFAULT NULL, 
+->birthyear int(11) DEFAULT NULL, 
+->startyear int(11) DEFAULT NULL);
+Query OK, 0 rows affected (0.05 sec)
+
+mysql> ALTER TABLE jbmanager ADD FOREIGN KEY (id) REFERENCES jbemployee(id);
+Query OK, 0 rows affected (0.04 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> ALTER TABLE jbemployee DROP FOREIGN KEY fk_emp_mgr;
+Query OK, 25 rows affected (0.06 sec)
+Records: 25  Duplicates: 0  Warnings: 0
+
+mysql> ALTER TABLE jbemployee DROP KEY fk_emp_mgr;
+Query OK, 0 rows affected (0.68 sec)
+
+mysql> SET foreign_key_checks = 0;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> ALTER TABLE jbemployee ADD CONSTRAINT fk_emp_mgr FOREIGN KEY(manager) REFERENCES jbmanager(id) ON DELETE SET NULL;
+Query OK, 25 rows affected (0.03 sec)
+Records: 25  Duplicates: 0  Warnings: 0
+
+mysql> SET foreign_key_checks = 1;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> INSERT INTO jbmanager SELECT emp1.id FROM jbemployee emp1, jbemployee emp2, jbdept WHERE emp1.id = emp2.manager OR jbdept.manager = emp1.id group by id;
+Query OK, 12 rows affected (0.04 sec)
+Records: 12  Duplicates: 0  Warnings: 0
+
+mysql> alter table jbmanager add column bonus int(11) not null default 0;
+Query OK, 12 rows affected (0.02 sec)
+Records: 12  Duplicates: 0  Warnings: 0
+
+mysql> select * from jbmanager;
++-----+----------------+--------+---------+-----------+-----------+-------+
+| id  | name           | salary | manager | birthyear | startyear | bonus |
++-----+----------------+--------+---------+-----------+-----------+-------+
+|  10 | Ross, Stanley  |  15908 |     199 |      1927 |      1945 |     0 |
+|  13 | Edwards, Peter |   9000 |     199 |      1928 |      1958 |     0 |
+|  26 | Thompson, Bob  |  13000 |     199 |      1930 |      1970 |     0 |
+|  32 | Smythe, Carol  |   9050 |     199 |      1929 |      1967 |     0 |
+|  33 | Hayes, Evelyn  |  10100 |     199 |      1931 |      1963 |     0 |
+|  35 | Evans, Michael |   5000 |      32 |      1952 |      1974 |     0 |
+|  37 | Raveen, Lemont |  11985 |      26 |      1950 |      1974 |     0 |
+|  55 | James, Mary    |  12000 |     199 |      1920 |      1969 |     0 |
+|  98 | Williams, Judy |   9000 |     199 |      1935 |      1969 |     0 |
+| 129 | Thomas, Tom    |  10000 |     199 |      1941 |      1962 |     0 |
+| 157 | Jones, Tim     |  12000 |     199 |      1940 |      1960 |     0 |
+| 199 | Bullock, J.D.  |  27000 |    NULL |      1920 |      1920 |     0 |
++-----+----------------+--------+---------+-----------+-----------+-------+
+12 rows in set (0.01 sec)
+
+-----------------------------------------------
+Written answer:
+We initilized the bonus value to 0 to avoid it being NULL, so we can add and subtract from it. 
+-----------------------------------------------
+
+
+4)
+mysql> UPDATE jbmanager, jbdept SET bonus = bonus + 10000 WHERE jbdept.manager = jbmanager.id ;
+Query OK, 11 rows affected (0.00 sec)
+Rows matched: 11  Changed: 11  Warnings: 0
+
+mysql> SELECT * FROM jbmanager;
++-----+----------------+--------+---------+-----------+-----------+-------+
+| id  | name           | salary | manager | birthyear | startyear | bonus |
++-----+----------------+--------+---------+-----------+-----------+-------+
+|  10 | Ross, Stanley  |  15908 |     199 |      1927 |      1945 | 10000 |
+|  13 | Edwards, Peter |   9000 |     199 |      1928 |      1958 | 10000 |
+|  26 | Thompson, Bob  |  13000 |     199 |      1930 |      1970 | 10000 |
+|  32 | Smythe, Carol  |   9050 |     199 |      1929 |      1967 | 10000 |
+|  33 | Hayes, Evelyn  |  10100 |     199 |      1931 |      1963 | 10000 |
+|  35 | Evans, Michael |   5000 |      32 |      1952 |      1974 | 10000 |
+|  37 | Raveen, Lemont |  11985 |      26 |      1950 |      1974 | 10000 |
+|  55 | James, Mary    |  12000 |     199 |      1920 |      1969 | 10000 |
+|  98 | Williams, Judy |   9000 |     199 |      1935 |      1969 | 10000 |
+| 129 | Thomas, Tom    |  10000 |     199 |      1941 |      1962 | 10000 |
+| 157 | Jones, Tim     |  12000 |     199 |      1940 |      1960 | 10000 |
+| 199 | Bullock, J.D.  |  27000 |    NULL |      1920 |      1920 |     0 |
++-----+----------------+--------+---------+-----------+-----------+-------+
+12 rows in set (0.00 sec)
+
+
+5)
+mysql> CREATE TABLE jbcustomer(id INTEGER NOT NULL, name VARCHAR(40) NOT NULL, address VARCHAR(40), city INTEGER(11) NOT NULL, PRIMARY KEY(id), FOREIGN KEY(city) REFERENCES jbcity(id));	
+Query OK, 0 rows affected (0.12 sec)
+
+mysql> CREATE TABLE jbaccount(id INTEGER NOT NULL, balance INTEGER NOT NULL, owner INTEGER(11) NOT NULL, PRIMARY KEY(id), FOREIGN KEY(owner) REFERENCES jbcustomer(id));
+Query OK, 0 rows affected (0.04 sec)
+
+mysql> RENAME TABLE jbdebit TO jbtransaction;
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> ALTER TABLE jbtransaction ADD CONSTRAINT FOREIGN KEY(account) REFERENCES jbaccount(id);  
+Query OK, 6 rows affected (0.05 sec)
+Records: 6  Duplicates: 0  Warnings: 0
+
+mysql> SET foreign_key_checks = 0;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> ALTER TABLE jbtransaction ADD CONSTRAINT FOREIGN KEY(account) REFERENCES jbaccount(id);  
+Query OK, 6 rows affected (0.05 sec)
+Records: 6  Duplicates: 0  Warnings: 0
+
+mysql> SET foreign_key_checks = 1;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> CREATE TABLE jbdeposit(id INTEGER(11), PRIMARY KEY(id), FOREIGN KEY(id) REFERENCES jbtransaction(id));
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> CREATE TABLE jbwithdrawal(id INTEGER(11), PRIMARY KEY(id), FOREIGN KEY(id) REFERENCES jbtransaction(id));
+Query OK, 0 rows affected (0.02 sec)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

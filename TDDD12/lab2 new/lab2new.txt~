@@ -1,0 +1,104 @@
+3)
+mysql> CREATE TABLE jbmanager(id INT NOT NULL, bonus INT NOT NULL DEFAULT '0');
+Query OK, 0 rows affected (0.01 sec)
+
+mysql> ALTER TABLE jbmanager ADD FOREIGN KEY (id) REFERENCES jbemployee(id);
+Query OK, 0 rows affected (0.03 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> ALTER TABLE jbemployee DROP FOREIGN KEY fk_emp_mgr;
+Query OK, 25 rows affected (0.10 sec)
+Records: 25  Duplicates: 0  Warnings: 0
+
+mysql> ALTER TABLE jbemployee DROP FOREIGN KEY fk_emp_mgr;
+Query OK, 25 rows affected (0.10 sec)
+Records: 25  Duplicates: 0  Warnings: 0
+
+mysql> ALTER TABLE jbemployee DROP KEY fk_emp_mgr;
+Query OK, 0 rows affected (0.54 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> INSERT INTO jbmanager (id) SELECT emp1.id FROM jbemployee emp1, jbemployee emp2, jbdept WHERE emp1.id = emp2.manager OR jbdept.manager = emp1.id group by id;
+Query OK, 12 rows affected (0.04 sec)
+Records: 12  Duplicates: 0  Warnings: 0
+
+mysql> ALTER TABLE jbdept DROP FOREIGN KEY fk_dept_mgr;
+Query OK, 19 rows affected (0.03 sec)
+Records: 19  Duplicates: 0  Warnings: 0
+
+mysql> ALTER TABLE jbdept DROP KEY fk_dept_mgr;
+Query OK, 0 rows affected (0.16 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> ALTER TABLE jbdept ADD FOREIGN KEY(manager) REFERENCES jbmanager(id) ON DELETE SET NULL;
+Query OK, 19 rows affected (0.05 sec)
+Records: 19  Duplicates: 0  Warnings: 0
+
+---------------------------------------------------
+WRITTEN ANSWER:
+We initilized the bonus value to 0 to avoid it being NULL, so we can add and subtract from it. 
+------------------------------------------------------
+
+4)
+mysql> UPDATE jbmanager, jbdept SET bonus = bonus + 10000 WHERE jbdept.manager = jbmanager.id ;
+Query OK, 11 rows affected (0.01 sec)
+Rows matched: 11  Changed: 11  Warnings: 0
+
+mysql> SELECT * FROM jbmanager;
++-----+-------+
+| id  | bonus |
++-----+-------+
+|  10 | 10000 |
+|  13 | 10000 |
+|  26 | 10000 |
+|  32 | 10000 |
+|  33 | 10000 |
+|  35 | 10000 |
+|  37 | 10000 |
+|  55 | 10000 |
+|  98 | 10000 |
+| 129 | 10000 |
+| 157 | 10000 |
+| 199 |     0 |
++-----+-------+
+12 rows in set (0.01 sec)
+
+5)
+
+mysql> CREATE TABLE jbcustomer(id INTEGER NOT NULL, name VARCHAR(40) NOT NULL, address VARCHAR(40), city INTEGER(11) NOT NULL, PRIMARY KEY(id), FOREIGN KEY(city) REFERENCES jbcity(id));
+Query OK, 0 rows affected (8.25 sec)
+
+mysql> CREATE TABLE jbaccount(id INTEGER NOT NULL, balance INTEGER NOT NULL, owner INTEGER(11) NOT NULL, PRIMARY KEY(id), FOREIGN KEY(owner) REFERENCES jbcustomer(id));
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> CREATE TABLE jbtransaction(id INT NOT NULL DEFAULT '0', date timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP, type VARCHAR(10) NOT NULL, employee INT NOT NULL, account INT NOT NULL, amount INT NOT NULL, item INT, quantity INT,  PRIMARY KEY(id), FOREIGN KEY(account) REFERENCES jbaccount(id), FOREIGN KEY(employee) REFERENCES jbemployee(id), FOREIGN KEY(item) REFERENCES jbitem(item));
+Query OK, 0 rows affected (0.02 sec)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

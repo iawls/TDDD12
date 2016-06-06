@@ -1,0 +1,351 @@
+
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS passenger, booking, flight, weeklyschedule, route, airports, profitfactor, weekdayfactor, creditcard, passportdata;
+
+DROP PROCEDURE IF EXISTS addDay;
+DROP PROCEDURE IF EXISTS addYear;
+DROP PROCEDURE IF EXISTS addDestination;
+DROP PROCEDURE IF EXISTS addRoute;
+DROP PROCEDURE IF EXISTS addFlight;
+DROP PROCEDURE IF EXISTS addReservation;
+DROP PROCEDURE IF EXISTS addPassenger;
+DROP PROCEDURE IF EXISTS addContact;
+DROP PROCEDURE IF EXISTS addPayment;
+
+DROP FUNCTION IF EXISTS calculateFreeSeats;
+DROP FUNCTION IF EXISTS calculatePrice;
+
+DROP TRIGGER IF EXISTS set_ticket_number;
+
+DROP VIEW IF EXISTS allFlights;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+CREATE TABLE passportdata(number INTEGER NOT NULL, name VARCHAR(30), PRIMARY KEY(number));
+
+CREATE TABLE creditcard(number BIGINT NOT NULL, holder VARCHAR(30), PRIMARY KEY(number));
+
+CREATE TABLE weekdayfactor(day VARCHAR(10), year INTEGER, factor DOUBLE, PRIMARY KEY(day,year));
+
+CREATE TABLE profitfactor(year INTEGER NOT NULL AUTO_INCREMENT, factor DOUBLE, PRIMARY KEY(year));
+
+CREATE TABLE airports(id VARCHAR(3) NOT NULL, name VARCHAR(30) NOT NULL, country VARCHAR(30) NOT NULL, PRIMARY KEY(id));
+
+CREATE TABLE route(id INTEGER NOT NULL AUTO_INCREMENT, destination VARCHAR(3) NOT NULL, start VARCHAR(3) NOT NULL, price DOUBLE, year INTEGER, PRIMARY KEY(id), FOREIGN KEY(destination) REFERENCES airports(id), FOREIGN KEY(start) REFERENCES airports(id));
+
+CREATE TABLE weeklyschedule(id INTEGER NOT NULL AUTO_INCREMENT, deptime TIME, day VARCHAR(10), year INTEGER, route INTEGER, PRIMARY KEY(id), FOREIGN KEY(route) REFERENCES route(id));
+
+CREATE TABLE flight(id INTEGER NOT NULL AUTO_INCREMENT, freeseats INTEGER DEFAULT 40, week INTEGER, weeklyschedule INTEGER, PRIMARY KEY(id), FOREIGN KEY(weeklyschedule) REFERENCES weeklyschedule(id));
+
+CREATE TABLE booking(id INTEGER NOT NULL AUTO_INCREMENT, paidprice DOUBLE DEFAULT NULL, creditcard BIGINT DEFAULT NULL, contact INTEGER, flight INTEGER, PRIMARY KEY(id), FOREIGN KEY(creditcard) REFERENCES creditcard(number), FOREIGN KEY(flight) REFERENCES flight(id));
+
+CREATE TABLE passenger(id INTEGER NOT NULL AUTO_INCREMENT, ticket INTEGER DEFAULT NULL, passport INTEGER, booking INTEGER, iscontact BOOL DEFAULT 0, email VARCHAR(30), phone BIGINT, PRIMARY KEY(id), FOREIGN KEY(passport) REFERENCES passportdata(number), FOREIGN KEY(booking) REFERENCES booking(id));
+
+ALTER TABLE booking ADD FOREIGN KEY(contact) REFERENCES passenger(id);
+
+
+DELIMITER //
+CREATE PROCEDURE addYear(IN year INTEGER, IN factor DOUBLE)
+BEGIN
+    INSERT INTO profitfactor 
+    VALUES(year,factor);
+END; //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE addDay(IN year INTEGER, IN day VARCHAR(10), IN factor DOUBLE)
+BEGIN
+    INSERT INTO weekdayfactor 
+    VALUES(day,year,factor);
+END; //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE addDestination(IN airport VARCHAR(3), IN name VARCHAR(30), IN country VARCHAR(30))
+BEGIN
+    INSERT INTO airports 
+    VALUES(airport,name,country);
+END; //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE addRoute(IN start VARCHAR(3), IN destination VARCHAR(3), IN year INTEGER, IN price DOUBLE)
+BEGIN
+    INSERT INTO route(destination,start,price,year) 
+    VALUES(destination,start,price,year);
+END; //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE addFlight(IN start VARCHAR(3), IN destination VARCHAR(3), IN year INTEGER, IN day VARCHAR(10), IN deptime TIME)
+BEGIN
+
+    DECLARE routeid INTEGER;
+    DECLARE scheduleid INTEGER;
+    DECLARE i INTEGER;
+    SET i = 1;
+    
+    SELECT id INTO routeid FROM route 
+        WHERE destination = route.destination AND start = route.start AND year = route.year;
+        
+    INSERT INTO weeklyschedule(deptime,day,year,route)
+        VALUES(deptime,day,year,routeid);
+    
+    SELECT id INTO scheduleid FROM weeklyschedule
+        WHERE deptime = weeklyschedule.deptime AND day = weeklyschedule.day AND year = weeklyschedule.year AND
+            routeid = weeklyschedule.route;
+        
+    WHILE i <= 52 DO
+        INSERT INTO flight(week,weeklyschedule)
+            VALUES(i,scheduleid);
+        SET i = i + 1;
+    END WHILE;
+    
+    
+END; //
+DELIMITER ;
+
+DELIMITER // 
+CREATE FUNCTION calculateFreeSeats(flightnumber INTEGER) RETURNS INTEGER
+NOT DETERMINISTIC 
+BEGIN
+    DECLARE freeseats_ INTEGER;
+    SELECT freeseats INTO freeseats_ FROM flight WHERE flightnumber = id;
+    RETURN freeseats_;
+
+END; //
+DELIMITER ;
+
+DELIMITER // 
+CREATE FUNCTION calculatePrice(flightnumber INTEGER) RETURNS DOUBLE
+NOT DETERMINISTIC 
+BEGIN
+
+    DECLARE totalprice DOUBLE DEFAULT 0;
+    DECLARE routeprice DOUBLE DEFAULT 0;
+    DECLARE wfactor DOUBLE DEFAULT 0;
+    DECLARE pfactor DOUBLE DEFAULT 0;
+    DECLARE bookedpassengers INTEGER DEFAULT 0;
+ 
+    SELECT price INTO routeprice FROM route WHERE route.id = (SELECT route FROM weeklyschedule WHERE 
+        weeklyschedule.id = (SELECT weeklyschedule FROM flight WHERE flight.id = flightnumber));
+    
+    SELECT factor INTO wfactor FROM weekdayfactor WHERE weekdayfactor.day = (SELECT day FROM weeklyschedule WHERE 
+        weeklyschedule.id = (SELECT weeklyschedule FROM flight WHERE flight.id = flightnumber));
+        
+    SELECT factor INTO pfactor FROM profitfactor WHERE profitfactor.year = (SELECT year FROM weeklyschedule WHERE 
+        weeklyschedule.id = (SELECT weeklyschedule FROM flight WHERE flight.id = flightnumber)); 
+        
+    SET bookedpassengers = 40 - calculateFreeSeats(flightnumber);
+        
+    SET totalprice = routeprice * wfactor * pfactor * ((bookedpassengers + 1)/40);  
+    
+    RETURN totalprice;  
+END; //
+DELIMITER ;
+
+DELIMITER //
+CREATE TRIGGER set_ticket_number AFTER UPDATE ON booking FOR EACH ROW
+BEGIN
+    
+
+    DECLARE i INTEGER DEFAULT 0;
+    DECLARE tmp_id INTEGER DEFAULT NULL;
+    DECLARE finished INTEGER DEFAULT NULL;
+    DECLARE tmp_cursor CURSOR FOR SELECT id FROM passenger WHERE NEW.id = passenger.booking;
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET finished = 1;
+
+
+    IF NEW.creditcard IS NOT NULL AND OLD.creditcard IS NULL THEN
+    
+        OPEN tmp_cursor;
+        
+        WHILE finished IS NULL DO
+        
+            FETCH tmp_cursor INTO tmp_id;
+            
+            IF finished IS NULL THEN
+                UPDATE passenger SET ticket = floor(1+rand()*1000000000) WHERE tmp_id = id;
+            END IF;
+            
+        END WHILE;
+        
+    END IF;
+END; //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE addReservation(IN start_ VARCHAR(3), IN destination_ VARCHAR(3), IN year_ INTEGER,
+    IN week_ INTEGER, IN day_ VARCHAR(10), IN deptime_ TIME, IN number_of_passengers INTEGER, OUT reservation_nr INTEGER)
+BEGIN
+   
+    DECLARE exists_ INTEGER DEFAULT NULL;
+    DECLARE i INTEGER DEFAULT 0;
+    DECLARE reservation_id INTEGER;
+    DECLARE flightid_ INTEGER;
+    DECLARE last_id INTEGER;
+    
+    SELECT route.id INTO exists_ FROM route, weeklyschedule WHERE destination_ = route.destination AND 
+        start_ = route.start AND year_ = route.year AND weeklyschedule.deptime = deptime_
+        AND day_ = weeklyschedule.day LIMIT 1;
+     
+   IF exists_ IS NOT NULL THEN
+
+        INSERT INTO booking(flight) SELECT flight.id FROM flight, weeklyschedule 
+            WHERE flight.weeklyschedule = weeklyschedule.id AND week_ = flight.week AND   
+                weeklyschedule.route = exists_ AND day_ = weeklyschedule.day AND year_ = weeklyschedule.year
+                    AND weeklyschedule.deptime = deptime_ LIMIT 1;
+        SELECT "HEJEHEJ" as "Message";        
+        SET last_id = LAST_INSERT_ID();
+        SELECT flight INTO flightid_ FROM booking WHERE id = last_id;
+         
+        IF number_of_passengers < calculateFreeseats(flightid_) THEN
+
+            SET reservation_id = last_id ;
+            SET reservation_nr = reservation_id;
+            
+            WHILE i < number_of_passengers DO
+                INSERT INTO passenger(booking) VALUES(reservation_id);
+                set i = i +1;
+            END WHILE;
+         ELSE
+             SELECT "There are not enough seats available on the chosen flight" as "Message";
+             DELETE FROM booking WHERE id = last_id;
+         END IF;
+        
+    ELSE    
+         IF exists_ IS NULL then
+             SELECT "There exist no flight for the given route, date and time" as "Message";
+         END IF;
+    END IF;
+END; //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE addPassenger(IN reservation_nr INTEGER, IN passport_ INTEGER, name VARCHAR(30))
+BEGIN
+    DECLARE exists_ INTEGER DEFAULT NULL;
+    DECLARE counter INTEGER DEFAULT 0;
+    DECLARE paid INTEGER DEFAULT NULL; 
+    DECLARE tmp_id INTEGER DEFAULT NULL; 
+
+    SELECT id INTO exists_ FROM booking WHERE id = reservation_nr;
+    
+    SELECT paidprice INTO paid FROM booking WHERE id = reservation_nr;
+    
+    IF exists_ IS NOT NULL AND paid IS NULL THEN
+        
+        INSERT IGNORE INTO passportdata VALUES(passport_, name);
+        SELECT id INTO tmp_id FROM passenger 
+            WHERE passenger.booking = reservation_nr AND passenger.passport IS NULL LIMIT 1;
+
+        IF tmp_id IS NOT NULL THEN
+            UPDATE passenger SET passport = passport_ WHERE tmp_id = passenger.id;
+
+        ELSE
+            INSERT INTO passenger(passport,booking) VALUES(passport_, reservation_nr);
+        END IF;    
+
+    ELSEIF exists_ IS NULL THEN
+        SELECT "The given reservation number does not exist" as "Message";
+    ELSE
+        SELECT "The booking has already been payed and no futher passengers can be added" as "Message";
+    END IF;
+    
+END; //
+DELIMITER ;
+
+
+DELIMITER //
+CREATE PROCEDURE addContact(IN reservation_nr INTEGER, IN passport_ INTEGER, email_ VARCHAR(30), phone_ BIGINT)
+BEGIN
+    DECLARE booking_exists_ INTEGER DEFAULT NULL;
+    DECLARE passport_exists_ INTEGER DEFAULT NULL;
+    
+    SELECT id INTO booking_exists_ FROM booking WHERE id = reservation_nr;
+    SELECT passport INTO passport_exists_ FROM passenger WHERE passport = passport_ LIMIT 1;
+    
+    IF booking_exists_ IS NOT NULL AND passport_exists_ THEN
+
+        UPDATE passenger SET isContact = 1, email = email_ , phone = phone_ WHERE passport = passport_ 
+            AND booking = reservation_nr;
+            
+        UPDATE booking SET contact = (SELECT id FROM passenger WHERE passport = passport_ 
+            AND booking = reservation_nr AND isContact > 0) WHERE id = reservation_nr;
+        
+    ELSE
+        IF booking_exists_ IS NULL then
+            SELECT "The given reservation number does not exist" as "Message";
+        ELSE
+            SELECT "The person is not a passenger of the reservation" as "Message";
+        END IF;
+    END IF;
+    
+END; //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE addPayment(IN reservation_nr INTEGER, IN name_ VARCHAR(30), creditcard_ BIGINT)
+BEGIN
+   
+   DECLARE contact_exists_ INTEGER DEFAULT NULL;
+   DECLARE reservation_exists_ INTEGER DEFAULT NULL;
+   DECLARE number_of_passengers_ INTEGER DEFAULT 0;
+   DECLARE flight_nr_ INTEGER DEFAULT NULL;
+   
+   SELECT id INTO contact_exists_ FROM passenger WHERE booking = reservation_nr AND isContact > 0 LIMIT 1;
+   
+   SELECT id INTO reservation_exists_ FROM booking WHERE id = reservation_nr LIMIT 1;
+   
+   SELECT COUNT(id) INTO number_of_passengers_ FROM passenger WHERE booking = reservation_nr ; 
+   
+   SELECT flight INTO flight_nr_ FROM booking WHERE id = reservation_nr LIMIT 1; 
+   
+   IF contact_exists_ IS NOT NULL AND reservation_exists_ IS NOT NULL 
+        AND calculateFreeseats(flight_nr_) > number_of_passengers_ THEN
+        
+
+   
+        INSERT IGNORE INTO creditcard VALUES(creditcard_,name_);
+        
+        UPDATE booking SET paidprice = calculatePrice(flight_nr_) * number_of_passengers_,
+             creditcard = creditcard_ WHERE id = reservation_nr;
+             
+        SELECT sleep(5);     
+        
+        UPDATE flight SET freeseats = freeseats - number_of_passengers_ WHERE flight_nr_ = id;
+        
+   ELSE
+        IF reservation_exists_ IS NULL THEN
+            SELECT "The given reservation number does not exist" as "Message";
+            
+        ELSEIF contact_exists_ IS NULL THEN
+            SELECT "The reservation has no contact yet" as "Message";
+            
+        ELSE
+            SELECT "There are not enough seats available on the flight anymore, deleting reservation" as "Message";
+            UPDATE booking SET contact = NULL WHERE id = reservation_nr;
+            DELETE FROM passenger WHERE booking = reservation_nr;
+            DELETE FROM booking WHERE id = reservation_nr;
+            
+           
+        END IF;  
+   END IF;
+     
+END; //
+DELIMITER ;
+
+CREATE VIEW allFlights as SELECT a.name AS "departure_city_name", b.name AS "destination_city_name", weeklyschedule.deptime AS "departure_time", weeklyschedule.day AS "departure_day", flight.week AS "departure_week", weeklyschedule.year AS "departure_year", flight.freeseats AS "nr_of_free_seats", calculatePrice(flight.id) AS "current_price_per_seat" FROM route JOIN airports a ON a.id = route.start JOIN airports b ON  b.id = route.destination JOIN weeklyschedule ON route.id = weeklyschedule.route JOIN flight ON flight.weeklyschedule = weeklyschedule.id ORDER BY week;
+
+
+
+
+
+
+
+
+
+
+

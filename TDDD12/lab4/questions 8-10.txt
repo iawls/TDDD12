@@ -1,0 +1,38 @@
+
+8.a) 
+By encrypting the data in the table.
+
+b) 
+1. It helps reducing the traffic between the client and the server.
+2. Security, minimizes the risk of having the tables abused.
+3. Maintainabilty, it is easier to maintain the scripts when they are all stored in one place.
+
+9.a)
+
+b) No, each transaction creates an isolated instance of the table and can't do anny changes to the
+table on the server or recieve any changes done to the table on the server.
+
+c) A:s reservation doesn't "exist" for B yet, since the transactions are isolated from eachother. They are isolated to avoid concurrency errors, such as the same SELECT query used multiple times during a transaction returns different sets of data. 
+
+10.
+a) No. We have sanitychecks for overbookings etc, and we weren't fast enough when running the scripts, so they didn't run exactly paralell. 
+
+b) Yes, if 2 payments are running exactly in paralell then it is possible. 
+
+The order must bu as following:
+
+If Payment A haven't reached this; 
+
+        UPDATE flight SET freeseats = freeseats - number_of_passengers_ WHERE flight_nr_ = id;
+        
+before Payment B reaches this;
+
+   IF contact_exists_ IS NOT NULL AND reservation_exists_ IS NOT NULL 
+        AND calculateFreeseats(flight_nr_) > number_of_passengers_ THEN
+        
+overbooking is possible!
+
+c) 
+It was possible by adding the command SLEEP(5) before the line:
+
+    UPDATE flight SET freeseats = freeseats - number_of_passengers_ WHERE flight_nr_ = id;

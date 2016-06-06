@@ -1,0 +1,113 @@
+JBMANAGER(Mid, bonus)
+
+mysql> create table jbmanager ( Mid int NOT NULL, bonus int NOT NULL, PRIMARY KEY (Mid) );
+
+mysql> insert into jbmanager (Mid) select manager from jbemployee where manager > 0 group by manager;
+
+mysql> insert ignore into jbmanager (Mid) select manager from jbdept where manager group by manager;
+
+mysql> select * from jbmanager;
++-----+-------+
+| Mid | bonus |
++-----+-------+
+|  10 |     0 |
+|  13 |     0 |
+|  26 |     0 |
+|  32 |     0 |
+|  33 |     0 |
+|  35 |     0 |
+|  37 |     0 |
+|  55 |     0 |
+|  98 |     0 |
+| 129 |     0 |
+| 157 |     0 |
+| 199 |     0 |
++-----+-------+
+12 rows in set (0.01 sec)
+
+mysql> update jbmanager inner join jbdept on jbdept.manager = jbmanager.Mid set bonus = 10000;
+
+3) We have to initialize the bonus since its zero not NULL.
+
+mysql> select * from jbmanager;
++-----+-------+
+| Mid | bonus |
++-----+-------+
+|  10 | 10000 |
+|  13 | 10000 |
+|  26 | 10000 |
+|  32 | 10000 |
+|  33 | 10000 |
+|  35 | 10000 |
+|  37 | 10000 |
+|  55 | 10000 |
+|  98 | 10000 |
+| 129 | 10000 |
+| 157 | 10000 |
+| 199 |     0 |
++-----+-------+
+12 rows in set (0.01 sec)
+
+create table jbcustomer (
+id int not null,
+name varchar(30) not null,
+lastname varchar(30) not null,
+address varchar(30) not null,
+city int not null,
+primary key (id), foreign key (city) references jbcity(id));
+
+create table jbaccounts (
+id int not null,
+balance int not null,
+credit int not null,
+customer int not null,
+primary key (id), foreign key (customer) references jbcustomer (id));
+
+create table jbtransaction (
+id int NOT NULL, 
+date timestamp NOT NULL, 
+amount int NOT NULL, 
+employee int NOT NULL, 
+PRIMARY KEY (id), FOREIGN KEY (employee) REFERENCES jbemployee(id));
+
+mysql> alter table jbsale drop foreign key fk_sale_debit;
+
+mysql> truncate table jbsale;
+
+mysql> alter table jbsale add foreign key (debit) references jbtransaction (id);
+
+create table withdrawal ( id int, primary key (id), foreign key (id) references jbtransaction(id));
+
+create table sale ( id int, primary key (id), foreign key (id) references jbtransaction(id));
+
+create table deposit ( id int, primary key (id), foreign key (id) references jbtransaction(id));
+
+
+
+NORMALISATION
+-------------------------------
+
+
+JBCITY(ID, NAME, STATE)
+
+JBCUSTOMER(ID, NAME, LASTNAME, ADDRESS, CITY)
+
+JBACCOUNTS(ID, BALANCE, CREDIT, CUSTOMER)
+
+JBTRANSACTION(ID, DATE, AMOUNT, EMPLOYEE, ACCOUNT)
+
+SALE(ID)
+
+DEPOSIT(ID)
+
+WITHDRAWAL(ID)
+
+JBSALE(DEBIT, ITEM, QUANTITY)
+
+HERPEDIDERPEDY DERPY DO
+
+
+
+
+
+
